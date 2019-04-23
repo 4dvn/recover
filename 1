@@ -1,0 +1,71 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+int main(int argc, char *argv[])
+{
+    bool writestart = false;
+    bool opened = false;
+
+    //ensure proper amount of arguments
+    if (argc != 2)
+    {
+        printf("Usage: ./recover image\n");
+        return 1;
+    }
+
+    //open memory card file
+    FILE *inptr = fopen(argv[1], "r");
+    if (inptr == NULL)
+    {
+        printf("File does not exist\n");
+        return 1;
+    }
+
+    //initialize memory for JPEG storage
+    unsigned char buffer[512];
+
+    int filecount = 0;
+
+    //open new JPEG file to write into
+    char filename[8];
+    FILE *jpeg = fopen(filename, "w");
+
+    while (fread(&buffer, 512, 1, inptr) != 0)
+    {
+        //read in first block of memory
+        fread(&buffer, 512, 1, inptr);
+
+        //if buffer is start of new JPEG...
+        if (buffer[0] == 0xff && buffer[1] == 0xd8 && buffer[2] == 0xff && (buffer[3] & 0xf0) == 0xe0)
+        {
+            //allow for writing to begin
+            writestart = true;
+
+            //create filename
+            sprintf(filename, "%03i.jpg", filecount);
+            filecount++;
+
+            //close last open file
+            if (opened == true)
+            {
+                //close finished jpeg
+                fclose(jpeg);
+
+                //open new JPEG file to write into
+                jpeg = fopen(filename, "w");
+            }
+
+            opened = true;
+
+            //write block to file
+            fwrite(buffer, 512, 1, jpeg);
+        }
+        //if it's not the start of a new JPEG...
+        else if (writestart == true)
+        {
+            //write block to file
+            fwrite(buffer, 512, 1, jpeg);
+        }
+    }
+}
